@@ -59,48 +59,42 @@ const signup = async (req, res) => {
 }
 
 const update = async (req, res) => {
-
+    const { email, currentPassword, newUsername, newEmail, newPassword } = req.body;
 
     try {
-        const { userId, newUserName, newEmail, newPassword } = req.body;
-        if (!userId) return res.status(400).json({ message: "userId is required" });
-
-        const findUser = await User.findById(userId);
-        if (!findUser) return res.status(404).json({ message: "USER NOT FOUND" });
-
-
-        if (newEmail && newEmail !== findUser.email) {
-            const emailTaken = await User.findOne({ email: newEmail });
-            if (emailTaken) {
-                return res.status(400).json({ message: "EMAIL ALREADY IN USE" });
-            }
-            findUser.email = newEmail;
+        const user = await User.findOne({ email: email });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
         }
 
-        if (newUserName) findUser.username = newUserName;
+        
+        const passwordCorrect = await bcrypt.compare(currentPassword, user.password);
+        if (!passwordCorrect) {
+            return res.status(400).json({ message: "Invalid current password" });
+        }
 
+        
+        if (newEmail && newEmail !== email) {
+            const existingUser = await User.findOne({ email: newEmail });
+            if (existingUser) {
+                return res.status(400).json({ message: "Email already in use" });
+            }
+        }
 
+        if (newUsername) user.username = newUsername;
+        if (newEmail) user.email = newEmail;
         if (newPassword) {
             const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(newPassword, salt);
-            findUser.password = hashedPassword;
+            user.password = await bcrypt.hash(newPassword, salt);
         }
 
-        await findUser.save();
+        await user.save();
 
-        const safeUser = {
-            id: findUser._id,
-            username: findUser.username,
-            email: findUser.email,
-        };
-
-        return res.status(200).json({ message: "USER UPDATED", user: safeUser });
+        res.status(200).json({ message: "User updated successfully" });
     } catch (err) {
-        console.error(err);
-        return res.status(500).json({ message: "INTERNAL SERVER ERROR" });
+        console.error("ERROR DURING UPDATE", err);
+        res.status(500).json({ message: "INTERNAL SERVER ERROR" });
     }
-
-
 }
 
 
